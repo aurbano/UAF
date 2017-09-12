@@ -1,1 +1,0 @@
-web: java -jar fidouaf/build/server/webapp-runner-*.jar --port $PORT fidouaf/build/libs/fidouaf.war
