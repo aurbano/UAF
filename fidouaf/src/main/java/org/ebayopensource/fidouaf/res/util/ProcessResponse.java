@@ -67,22 +67,20 @@ public class ProcessResponse {
 		return result;
 	}
 
-	public boolean processTxResponse(TransactionAction resp, String registrationId) {
+	public boolean processTxResponse(String challenge, String signature, String registrationId) {
 		boolean result;
-		RegistrationRecord registrationRecord = null;
 
 		try {
 			AuthenticatorRecord authRecord = new AuthenticatorRecord();
 			authRecord.registrationID = registrationId;
-			registrationRecord = getRegistration(authRecord, StorageImpl.getInstance());
+			RegistrationRecord registrationRecord = getRegistration(authRecord, StorageImpl.getInstance());
 			String pubKey = registrationRecord.PublicKey;
 
-			ByteInputStream response = new ByteInputStream(
-					Base64.decodeBase64(resp.response));
-			ByteInputStream signature = new ByteInputStream(
-					Base64.decodeBase64(resp.signature));
+			byte[] challengeBytes = challenge.getBytes();
+			ByteInputStream signatureBytes = new ByteInputStream(
+					Base64.decodeBase64(signature));
 
-			result = NotaryImpl.getInstance().verifySignature(response.readAll(), signature.readAll(), pubKey, AlgAndEncodingEnum.UAF_ALG_SIGN_SECP256R1_ECDSA_SHA256_DER);
+			result = NotaryImpl.getInstance().verifySignature(challengeBytes, signatureBytes.readAll(), pubKey, AlgAndEncodingEnum.UAF_ALG_SIGN_SECP256R1_ECDSA_SHA256_DER);
 
 			return result;
 
