@@ -18,12 +18,7 @@ package org.ebayopensource.fidouaf.res;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 import javax.print.attribute.standard.Media;
 import javax.ws.rs.*;
@@ -384,6 +379,7 @@ public class FidoUafResource {
                     if (txAction[0].response.equals("SIGNED_TX") || txAction[0].response.equals("DECLINED_TX")) {
                         Dash.getInstance().addTxResponse(txAction[0].response, authReq.challenge);
                         txResp[0].response = txAction[0].response;
+                        removeTxFromPendingForRegID(registrationId, challenge);
                     }
                     else
                         return new TransactionResponse[0];
@@ -396,6 +392,17 @@ public class FidoUafResource {
 			}
 		}
 		return new TransactionResponse[0];
+	}
+
+	public void removeTxFromPendingForRegID(String registrationId, String challenge) {
+		List<AuthenticationRequest> requests = new ArrayList<AuthenticationRequest>();
+		Collections.addAll(requests, Dash.getInstance().getAuthReqests(registrationId));
+		for (AuthenticationRequest req: requests) {
+			if (req.challenge.equals(challenge)) {
+				requests.remove(req);
+				return;
+			}
+		}
 	}
 
 	@GET
@@ -411,8 +418,7 @@ public class FidoUafResource {
 	}
 
 	@GET
-	@Path("/public/authRequest/{challenge}")
-//	@Produces(MediaType.APPLICATION_JSON)
+	@Path("/public/authResponse/{challenge}")
 	public String getTransactionStatus(@PathParam("challenge") String challenge) {
 		String response = Dash.getInstance().getTxResponse(challenge);
 		return response;
