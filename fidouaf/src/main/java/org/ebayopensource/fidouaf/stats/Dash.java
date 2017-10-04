@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class Dash {
 	
@@ -36,7 +37,7 @@ public class Dash {
 
 	private static Dash instance = new Dash();
 
-	private Map<String, List<Transaction>> txResponses = new HashMap<String, List<Transaction>>();
+	private Map<String, String> txResponses = new HashMap<String, String>();
 	private Map<String, List<AuthenticationRequest>> authStats = new  HashMap<String, List<AuthenticationRequest>>();
 	private Map<String, Object> regStats = new HashMap<String, Object>();
 
@@ -75,7 +76,10 @@ public class Dash {
 
 	public AuthenticationRequest[] getAuthReqests(String registrationID) {
         List<AuthenticationRequest> requests = authStats.get(registrationID);
-	    return requests.toArray(new AuthenticationRequest[requests.size()]);
+        if (requests != null)
+	    	return requests.toArray(new AuthenticationRequest[requests.size()]);
+        else
+        	return new AuthenticationRequest[0];
     }
 
     public boolean removeAuthRequest(String registrationId, AuthenticationRequest authReq) {
@@ -88,17 +92,31 @@ public class Dash {
 			return false;
 	}
 
-	public void addTxResponse(String key, Transaction t) {
-		List<Transaction> transactions = txResponses.get(key);
-		if (transactions == null) {
-			transactions = new ArrayList<Transaction>();
-		}
-		transactions.add(t);
-		txResponses.put(key, transactions);
+	public void addTxResponse(String response, String challenge) {
+		txResponses.put(challenge, response);
+//		String transactions = txResponses.get(key);
+//		if (transactions == null) {
+//			transactions = new ArrayList<Transaction>();
+//		}
+//		transactions.add(t);
+//		txResponses.put(key, transactions);
 	}
 
-	public Transaction[] getTxResponse(String key) {
-		List<Transaction> tx = txResponses.get(key);
-		return tx.toArray(new Transaction[tx.size()]);
+	public String getTxResponse(String challenge) {
+		String response = txResponses.get(challenge);
+		if (response != null)
+			return response;
+		else {
+			Set<String> keys = authStats.keySet();
+			for (String key: keys) {
+				List<AuthenticationRequest> requests = authStats.get(key);
+				for (AuthenticationRequest req: requests) {
+					if (req.challenge.equals(challenge))
+						return "PENDING";
+				}
+			}
+
+		}
+		return "";
 	}
 }

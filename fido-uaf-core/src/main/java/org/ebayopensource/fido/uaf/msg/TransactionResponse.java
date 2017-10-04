@@ -1,7 +1,7 @@
 package org.ebayopensource.fido.uaf.msg;
 
 public class TransactionResponse {
-    public Long transactionId;
+    public String challenge;
     public Transaction transaction;
     public String response;
 }

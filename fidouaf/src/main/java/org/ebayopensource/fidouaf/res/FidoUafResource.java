@@ -18,13 +18,9 @@ package org.ebayopensource.fidouaf.res;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
+import javax.print.attribute.standard.Media;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
@@ -320,7 +316,6 @@ public class FidoUafResource {
 		Transaction t = new Transaction();
 		t.content = trxContent;
 		t.contentType = MediaType.TEXT_PLAIN;
-		t.id = System.currentTimeMillis();
 		authReqObj[0].transaction[0] = t;
 	}
 
@@ -331,42 +326,42 @@ public class FidoUafResource {
 		return ret;
 	}
 
-	@POST
-	@Path("/public/authResponse")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public AuthenticationRequest[] processAuthResponse(String payload) {
-		if (!payload.isEmpty()) {
-//			Dash.getInstance().stats.put(Dash.LAST_AUTH_RES, payload);
-			Gson gson = new Gson();
-			AuthenticationResponse[] authResp = gson.fromJson(payload,
-					AuthenticationResponse[].class);
-
-//			Dash.getInstance().stats.put(Dash.LAST_AUTH_RES, authResp);
-//			Dash.getInstance().addStats(authResp[0].registrationID, Dash.LAST_AUTH_RES, authResp);
-			Dash.getInstance().history.add(authResp);
-			AuthenticatorRecord[] result = new ProcessResponse()
-					.processAuthResponse(authResp[0]);
-			if(result[0].status.equals("SUCCESS")) {
-				AuthenticationRequest[] response = Dash.getInstance().getAuthReqests(authResp[0].registrationID);
-				return response;
-			}
-			return new AuthenticationRequest[0];
-		}
-		return new AuthenticationRequest[0];
-	}
+//	@POST
+//	@Path("/public/authResponse")
+//	@Consumes(MediaType.APPLICATION_JSON)
+//	@Produces(MediaType.APPLICATION_JSON)
+//	public AuthenticationRequest[] processAuthResponse(String payload) {
+//		if (!payload.isEmpty()) {
+////			Dash.getInstance().stats.put(Dash.LAST_AUTH_RES, payload);
+//			Gson gson = new Gson();
+//			AuthenticationResponse[] authResp = gson.fromJson(payload,
+//					AuthenticationResponse[].class);
+//
+////			Dash.getInstance().stats.put(Dash.LAST_AUTH_RES, authResp);
+////			Dash.getInstance().addStats(authResp[0].registrationID, Dash.LAST_AUTH_RES, authResp);
+//			Dash.getInstance().history.add(authResp);
+//			AuthenticatorRecord[] result = new ProcessResponse()
+//					.processAuthResponse(authResp[0]);
+//			if(result[0].status.equals("SUCCESS")) {
+//				AuthenticationRequest[] response = Dash.getInstance().getAuthReqests(authResp[0].registrationID);
+//				return response;
+//			}
+//			return new AuthenticationRequest[0];
+//		}
+//		return new AuthenticationRequest[0];
+//	}
 
 	@PUT
-	@Path("/public/authResponse/{registrationId}/{txIndex}")
+	@Path("/public/authResponse/{registrationId}/{challenge}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public TransactionResponse[] processTxData(@PathParam("registrationId") String registrationId,
-											   @PathParam("txIndex") Long txIndex, String payload) {
+											   @PathParam("challenge") String challenge, String payload) {
 		if (!payload.isEmpty()) {
 			TransactionAction[] txAction = gson.fromJson(payload,
 					TransactionAction[].class);
 
-			if(new ProcessResponse().processTxResponse(txAction[0], registrationId)) {
+			if(new ProcessResponse().processTxResponse(challenge, txAction[0].signature, registrationId)) {
 
 				TransactionResponse[] txResp = new TransactionResponse[1];
 				txResp[0] = new TransactionResponse();
@@ -374,25 +369,22 @@ public class FidoUafResource {
 				AuthenticationRequest[] requests = Dash.getInstance().getAuthReqests(registrationId);
 				AuthenticationRequest authReq = new AuthenticationRequest();
 				for (AuthenticationRequest r : requests) {
-					if (r.transaction[0].id.equals(txIndex)) {
+					if (r.challenge.equals(challenge)) {
 						authReq = r;
 						break;
 					}
 				}
 				if (Dash.getInstance().removeAuthRequest(registrationId, authReq)) {
 
-                    if (txAction[0].response.equals("U0lHTkVEX1RY")) {
-                        Dash.getInstance().addTxResponse("SIGNED_TX", authReq.transaction[0]);
-                        txResp[0].response = "SIGNED_TX";
-                    }
-                    else if (txAction[0].response.equals("REVDTElORURfVFg=")) {
-                        Dash.getInstance().addTxResponse("DECLINED_TX", authReq.transaction[0]);
-                        txResp[0].response = "DECLINED_TX";
+                    if (txAction[0].response.equals("SIGNED_TX") || txAction[0].response.equals("DECLINED_TX")) {
+                        Dash.getInstance().addTxResponse(txAction[0].response, authReq.challenge);
+                        txResp[0].response = txAction[0].response;
+                        removeTxFromPendingForRegID(registrationId, challenge);
                     }
                     else
                         return new TransactionResponse[0];
-//                    Dash.getInstance().history.add(txResp);
-					txResp[0].transactionId = txIndex;
+
+					txResp[0].challenge = challenge;
 					txResp[0].transaction = authReq.transaction[0];
 
 					return txResp;
@@ -402,19 +394,33 @@ public class FidoUafResource {
 		return new TransactionResponse[0];
 	}
 
+	public void removeTxFromPendingForRegID(String registrationId, String challenge) {
+		List<AuthenticationRequest> requests = new ArrayList<AuthenticationRequest>();
+		Collections.addAll(requests, Dash.getInstance().getAuthReqests(registrationId));
+		for (AuthenticationRequest req: requests) {
+			if (req.challenge.equals(challenge)) {
+				requests.remove(req);
+				return;
+			}
+		}
+	}
+
 	@GET
-	@Path("/public/getTransactions/{registrationId}")
+	@Path("/public/authRequest/{registrationId}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Transaction[] getTransactions(@PathParam("registrationId") String registrationId) {
+	public AuthenticationRequest[] getTransactions(@PathParam("registrationId") String registrationId) {
 		AuthenticationRequest[] requests = Dash.getInstance().getAuthReqests(registrationId);
 		if (requests != null) {
-			List<Transaction> transactions = new ArrayList<Transaction>();
-			for (AuthenticationRequest r : requests) {
-				transactions.add(r.transaction[0]);
-			}
 //			Dash.getInstance().history.add(transactions);
-			return transactions.toArray(new Transaction[transactions.size()]);
+			return requests;
 		}
-		return new Transaction[0];
+		return new AuthenticationRequest[0];
+	}
+
+	@GET
+	@Path("/public/authResponse/{challenge}")
+	public String getTransactionStatus(@PathParam("challenge") String challenge) {
+		String response = Dash.getInstance().getTxResponse(challenge);
+		return response;
 	}
 }
