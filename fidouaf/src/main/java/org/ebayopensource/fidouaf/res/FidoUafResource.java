@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.util.*;
 
 import javax.print.attribute.standard.Media;
+import javax.security.auth.message.AuthStatus;
 import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
@@ -37,6 +38,7 @@ import org.ebayopensource.fido.uaf.storage.DuplicateKeyException;
 import org.ebayopensource.fido.uaf.storage.RegistrationRecord;
 import org.ebayopensource.fido.uaf.storage.SystemErrorException;
 import org.ebayopensource.fido.uaf.tlv.ByteInputStream;
+import org.ebayopensource.fidouaf.RPserver.msg.TxStatus;
 import org.ebayopensource.fidouaf.facets.Facets;
 import org.ebayopensource.fidouaf.facets.TrustedFacets;
 import org.ebayopensource.fidouaf.res.util.DeregRequestProcessor;
@@ -419,8 +421,8 @@ public class FidoUafResource {
 
 	@GET
 	@Path("/public/authResponse/{challenge}")
-	public String getTransactionStatus(@PathParam("challenge") String challenge) {
+	public TxStatus getTransactionStatus(@PathParam("challenge") String challenge) {
 		String response = Dash.getInstance().getTxResponse(challenge);
-		return response;
+		return new TxStatus(response);
 	}
 }
