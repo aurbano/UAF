@@ -421,6 +421,7 @@ public class FidoUafResource {
 
 	@GET
 	@Path("/public/authResponse/{challenge}")
+	@Produces(MediaType.APPLICATION_JSON)
 	public TxStatus getTransactionStatus(@PathParam("challenge") String challenge) {
 		String response = Dash.getInstance().getTxResponse(challenge);
 		return new TxStatus(response);
